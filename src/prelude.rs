@@ -1,5 +1,5 @@
 pub use crate::common::types::{Order, PrimaryKey, CursorPaginatedResult, PaginatedResult};
-pub use crate::common::error::{KitxError, QueryError, RelationError};
+pub use crate::common::error::{QueryError, RelationError};
 pub use crate::common::fields::{batch_extract, extract_all, extract_with_bind, extract_with_filter, get_value, get_values};
 pub use crate::common::filter::{push_primary_key_bind, push_primary_key_conditions};
 pub use crate::common::helper::{get_table_name, QueryCondition};

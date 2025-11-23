@@ -1,8 +1,9 @@
 use std::marker::PhantomData;
 
-use crate::common::{error::QueryError, filter::push_primary_key_bind, helper::get_table_name, types::{JoinType, PrimaryKey, Order}};
+use crate::common::{filter::push_primary_key_bind, helper::get_table_name, types::{JoinType, PrimaryKey, Order}};
 use field_access::FieldAccess;
-use sqlx::{Database, Encode, Error, QueryBuilder, Type};
+use sqlx::{Database, Encode, QueryBuilder, Type};
+use log::error;
 
 /// Select query builder
 /// 
@@ -262,10 +263,10 @@ where
     /// 
     /// # Arguments
     /// * `page_number` - 页码（从1开始）
-    /// * `page_size` - 每页记录数
+    /// * `page_size` - 毎页记录数
     /// 
     /// # Returns
-    pub fn paginate(mut self, page_number: u64, page_size: u64) -> Result<QueryBuilder<'a, DB>, Error> 
+    pub fn paginate(mut self, page_number: u64, page_size: u64) -> QueryBuilder<'a, DB> 
     where
         VAL: From<i64> + 'a,
     {
@@ -273,7 +274,8 @@ where
             self.add_from_clause();
         }
         if page_size == 0 || page_number < 1 {
-            return Err(QueryError::PageNumberInvalid.into());
+            error!("Invalid page number ({}) or page size ({}) for pagination", page_number, page_size);
+            return QueryBuilder::new("");
         }
         let offset = ((page_number - 1) * page_size) as i64;
         let limit = page_size as i64;
@@ -284,7 +286,7 @@ where
             .push(" OFFSET ")
             .push_bind(VAL::from(offset));
 
-        Ok(self.query_builder)
+        self.query_builder
     }
 
     /// 添加游标分页
@@ -302,7 +304,7 @@ where
         sort_order: Order, 
         current_cursor: Option<VAL>, 
         limit: u64
-    ) -> Result<QueryBuilder<'a, DB>, Error>
+    ) -> QueryBuilder<'a, DB>
     where
         VAL: From<i64> + 'a,
     {
@@ -310,7 +312,8 @@ where
             self.add_from_clause();
         }
         if limit < 1 {
-            return Err(QueryError::PageNumberInvalid.into());
+            error!("Invalid limit ({}) for cursor pagination", limit);
+            return QueryBuilder::new("");
         }
         if let Some(cursor_value) = current_cursor {
             let operator = if sort_order == Order::Asc { ">" } else { "<" };
@@ -330,7 +333,7 @@ where
         self = self.order_by(primary_key, sort_order);        
         self.query_builder.push(" LIMIT ").push_bind(VAL::from(limit as i64));
         
-        Ok(self.query_builder)
+        self.query_builder
     }
 
     /// 构建最终查询

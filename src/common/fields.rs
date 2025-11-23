@@ -67,7 +67,7 @@ use super::conversion::{ValueConvert, is_empty_or_none};
 /// let (names, values): (Vec<&str>, Vec<String>) = extract_all(entity.fields());
 /// assert_eq!(names.len(), values.len());
 /// ```
-pub fn extract_all<VAL>(fields: Fields) -> (Vec<&str>, Vec<VAL>) 
+pub fn extract_all<VAL>(fields: Fields<'_>) -> (Vec<&str>, Vec<VAL>) 
 where 
     VAL: ValueConvert,
 {

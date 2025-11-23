@@ -1,10 +1,11 @@
 use std::marker::PhantomData;
 
 use field_access::FieldAccess;
+use log::error;
 use sqlx::{Database, Encode, Error, QueryBuilder, Type};
 
 use crate::common::{
-    conversion::ValueConvert, error::QueryError, fields::extract_with_bind, filter::push_primary_key_conditions, helper::get_table_name, types::PrimaryKey
+    conversion::ValueConvert, fields::extract_with_bind, filter::push_primary_key_conditions, helper::get_table_name, types::PrimaryKey
 };
 
 /// Update query builder
@@ -146,7 +147,8 @@ where
             },
         );
         if fields.0.is_empty() {    
-            return Err(QueryError::ColumnsListEmpty.into());
+            error!("No valid fields provided for update operation");
+            return Err(Error::Protocol("No valid fields provided".to_string()));
         }
 
         query_builder.push(" WHERE ");

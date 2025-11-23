@@ -355,16 +355,17 @@ pub type Upsert<'a, ET> = upsert_postgres::Upsert<'a, ET, Postgres, DataKind>;
 mod tests {
 
     use crate::{
-        common::types::{CursorPaginatedResult, PaginatedResult, PrimaryKey, Order}, 
-        postgres::{builder::{Delete, Insert, Select, Subquery, Update, Upsert, QB}, 
+        common::types::{CursorPaginatedResult, Order, PaginatedResult, PrimaryKey}, 
+        postgres::{builder::{Delete, Insert, QB, Select, Subquery, Update, Upsert}, 
         connection, kind::DataKind, 
         query::{execute, fetch_all, fetch_one, fetch_scalar}}, 
-        test_utils::{article::Article, init::get_database_url}
+        test_utils::{article::Article, init::{get_database_url, init_logger}}
     };
     //use super::*;
 
 
     async fn init_pool() {
+        init_logger();
         let database_url = get_database_url().await;
         connection::create_db_pool(&database_url).await.unwrap();
     }
@@ -376,7 +377,7 @@ mod tests {
         let mut entity = Article::new(100,"vvvv", None);
         entity.content = Some("abc".to_string());
 
-        let qb = Insert::one(&entity, &ARTICLE_KEY).unwrap();
+        let qb = Insert::one(&entity, &ARTICLE_KEY);
 
         init_pool().await;
         let result = execute(qb).await.unwrap(); 
@@ -391,7 +392,7 @@ mod tests {
         entity2.content = Some("abc222".to_string());
 
         let binding = [entity1, entity2];
-        let qb = Insert::many(&binding, &ARTICLE_KEY).unwrap();
+        let qb = Insert::many(&binding, &ARTICLE_KEY);
 
         init_pool().await;
         let result = execute(qb).await.unwrap(); 
@@ -404,7 +405,7 @@ mod tests {
         entity.content = Some("abc".to_string());
         entity.id = 0;
 
-        let qb = Upsert::one(&entity, &ARTICLE_KEY).unwrap();
+        let qb = Upsert::one(&entity, &ARTICLE_KEY);
 
         init_pool().await;
         let result = execute(qb).await.unwrap(); 
@@ -525,7 +526,7 @@ mod tests {
         let qb = Select::<Article>::table()
             .filter(filter_build_fn)
             .order_by("id", Order::Desc)
-            .paginate(1, 10).unwrap();
+            .paginate(1, 10);
         
         init_pool().await;
         let list = fetch_all::<Article>(qb).await.unwrap();
@@ -555,7 +556,7 @@ mod tests {
 
         // 初始请求（无游标）
         let cursor_qb = Select::<Article>::table()
-            .cursor(column_key, Order::Asc, None, limit).unwrap();
+            .cursor(column_key, Order::Asc, None, limit);
         
         let result1 = fetch_all::<Article>(cursor_qb).await.unwrap();
         let mut paginated1 = CursorPaginatedResult::new(result1, limit, Order::Asc);
@@ -566,7 +567,7 @@ mod tests {
         // 使用next_cursor获取下一页
         let next_cursor = paginated1.next_cursor;
         let cursor_qb2 = Select::<Article>::table()
-            .cursor(column_key, Order::Asc, next_cursor, limit).unwrap();
+            .cursor(column_key, Order::Asc, next_cursor, limit);
         
         let result2 = fetch_all::<Article>(cursor_qb2).await.unwrap();
         let mut paginated2 = CursorPaginatedResult::<Article, DataKind>::new(result2, limit, Order::Asc);
@@ -576,7 +577,7 @@ mod tests {
         
         // 验证排序逻辑（降序测试）
         let cursor_qb_desc = Select::<Article>::table()
-            .cursor(column_key, Order::Desc, None, limit).unwrap();
+            .cursor(column_key, Order::Desc, None, limit);
         
         let result_desc = fetch_all::<Article>(cursor_qb_desc).await.unwrap();
         let mut paginated_desc = CursorPaginatedResult::<Article, DataKind>::new(result_desc, limit, Order::Desc);

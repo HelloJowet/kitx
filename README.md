@@ -53,7 +53,7 @@ async fn test_update_one() {
     entity.id = 1;
 
     const KEY = PrimaryKey::Single("id", true);
-    let qb = Update::one(&entity, &KEY, true).unwrap();
+    let qb = Update::one(&entity, &KEY, true);
 
     let pool = connection::get_db_pool().unwrap();
     let result = qb.build().execute(&*pool).await.unwrap();
@@ -69,7 +69,7 @@ async fn test_find_list_paginated() {
 
    let qb = Select::<Article>::table()
       .order_by("id", Order::Desc)
-      .paginate(page_number, page_size).unwrap();
+      .paginate(page_number, page_size);
 
    let pool = connection::get_db_pool().unwrap();
    let list = qb.build_query_as::<Article>().fetch_all(&*pool).await.unwrap();
@@ -114,20 +114,20 @@ async fn test_with_cte() {
 
 ```toml
 [dependencies]
-kitx = "0.0.18"
+kitx = "0.0.19"
 ```
 
 Or, if targeting a specific database (recommended):
 
 ```toml
 # For PostgreSQL
-kitx = { version = "0.0.18", features = ["postgres"] }
+kitx = { version = "0.0.19", features = ["postgres"] }
 
 # For MySQL
-kitx = { version = "0.0.18", features = ["mysql"] }
+kitx = { version = "0.0.19", features = ["mysql"] }
 
 # For SQLite
-kitx = { version = "0.0.18", features = ["sqlite"] }
+kitx = { version = "0.0.19", features = ["sqlite"] }
 ```
 
 > All three databases are supported by default. Enabling only required features improves compile performance.
@@ -149,6 +149,7 @@ async fn test_find_all() {
 ```
 
 For more examples, check integration tests under each database module.
+For query statement error messages, use log::error for output. Handle these in conjunction with the logging crate and sqlx::Error.
 
 ---
 
@@ -156,8 +157,8 @@ For more examples, check integration tests under each database module.
 
 | Method | Description | Example |
 |--------|-------------|---------|
-| `one` | Creates a single record insert operation | `Insert::one(&entity, &PRIMARY_KEY)?` |
-| `many` | Creates multiple records insert operation | `Insert::many(&entities, &PRIMARY_KEY)?` |
+| `one` | Creates a single record insert operation | `Insert::one(&entity, &PRIMARY_KEY)` |
+| `many` | Creates multiple records insert operation | `Insert::many(&entities, &PRIMARY_KEY)` |
 | `table` | Creates an insert operation with the default table name | `Insert::<Article>::table()` |
 | `with_table` | Creates an insert operation with a custom table name | `Insert::with_table("custom_table")...` |
 | `from_query` | Creates an Insert instance from a query | `Insert::from_query(query_builde)` |
@@ -170,7 +171,7 @@ For more examples, check integration tests under each database module.
 
 | Method | Description | Example |
 |--------|-------------|---------|
-| `one` | Creates a single entity update operation | `Update::one(&entity, &PRIMARY_KEY, true)?` |
+| `one` | Creates a single entity update operation | `Update::one(&entity, &PRIMARY_KEY, true)` |
 | `table` | Creates an Update instance with the default table name | `Update::<Article>::table()` |
 | `with_table` | Creates an Update instance with a custom table name | `Update::with_table("custom_table")...` |
 | `from_query` | Creates an Update instance from a query | `Update::from_query(query_builder)...` |
@@ -184,8 +185,8 @@ For more examples, check integration tests under each database module.
 
 | Method | Description | Example |
 |--------|-------------|---------|
-| `one` | Creates a single record upsert operation | `Upsert::one(&entity, &PRIMARY_KEY)?` |
-| `many` | Creates multiple records upsert operation | `Upsert::many(&entities, &PRIMARY_KEY)?` |
+| `one` | Creates a single record upsert operation | `Upsert::one(&entity, &PRIMARY_KEY)` |
+| `many` | Creates multiple records upsert operation | `Upsert::many(&entities, &PRIMARY_KEY)` |
 
 ## 4. Delete Builder
 
@@ -215,8 +216,8 @@ For more examples, check integration tests under each database module.
 | `having` | Creates a HAVING clause | `Select::table().having(fn)` |
 | `by_primary_key` | Creates a SELECT query by primary key | `Select::table().by_primary_key(&PRIMARY_KEY, &ids)` |
 | `order_by` | Creates an ORDER BY clause | `Select::table().order_by("id", Order::Desc)` |
-| `paginate` | Creates a pagination query statement | `Select::table().paginate(1, 10)?` |
-| `cursor` | Creates a cursor pagination query statement | `Select::table().cursor("id", Order::Asc, None, 10)?` |
+| `paginate` | Creates a pagination query statement | `Select::table().paginate(1, 10)` |
+| `cursor` | Creates a cursor pagination query statement | `Select::table().cursor("id", Order::Asc, None, 10)` |
 | `finish` | Completes building and returns the internal QueryBuilder | `Select::table().finish()` |
 
 ## 6. Subquery Builder
@@ -284,15 +285,16 @@ For more examples, check integration tests under each database module.
 ### 📦 使用指南
 
 更多使用例子，请参考文档、各数据库类型下的 builder 测试用例。
+查询语句的错误信息，使用log:error输出，请结合日志组件库和sqlx:Error进行处理。
 
 ---
 
 💡 **说明**:  
 > Kitx 本质是将语句按关键词分割、组成链式操作，如："SELECT {} FROM {} WHERE {}"，然后利用实体模型数据解构，自动填充{}。若无法满足条件，则使用手动填充 `fn(QueryBuilder)`，支持别名、关联查询、嵌套子句等。 
 
-> 部分直接操作实体模型的方法（名为 `one`、`many` 的方法）无法使用手动填充，且表名（蛇形命名）必须与实体模型结构体名（驼峰命名）对应。  
+> 部分直接操作实体模型的方法（名为 `one`、`many` 的方法）无法使用手动填充，但表名（蛇形命名）必须与实体模型结构体名（驼峰命名）对应。  
 
-> 每个方法都经过了单元测试，确保功能正常。
+> 方法都经过了单元测试，确保功能正常。
 
 ---
 

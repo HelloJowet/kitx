@@ -1,10 +1,11 @@
 use std::{iter::once, marker::PhantomData};
 
 use field_access::FieldAccess;
-use sqlx::{Database, Encode, Error, QueryBuilder, Type};
+use sqlx::{Database, Encode, QueryBuilder, Type};
+use log::error;
 
 use crate::common::{
-    conversion::ValueConvert, error::QueryError, fields::batch_extract, helper::get_table_name, types::PrimaryKey
+    conversion::ValueConvert, fields::batch_extract, helper::get_table_name, types::PrimaryKey
 };
 
 /// SQLite Upsert query builder
@@ -48,7 +49,7 @@ where
     /// * `primary_key` - Primary key definition
     /// 
     /// # Returns
-    /// A QueryBuilder with the UPSERT query or an Error
+    /// A QueryBuilder with the UPSERT query
     /// 
     /// 批量执行 UPSERT 操作
     /// 
@@ -57,15 +58,16 @@ where
     /// * `primary_key` - 主键定义
     /// 
     /// # 返回值
-    /// 包含 UPSERT 查询的 QueryBuilder 或错误
+    /// 包含 UPSERT 查询的 QueryBuilder
     pub fn many(
         models: impl IntoIterator<Item = &'a ET>,
         primary_key: &PrimaryKey<'a>,
-    ) -> Result<QueryBuilder<'a, DB>, Error> {
+    ) -> QueryBuilder<'a, DB> {
        
         let models: Vec<_> = models.into_iter().collect();
         if models.is_empty() {
-            return Err(QueryError::NoEntitiesProvided.into());
+            error!("No entities provided for upsert operation");
+            return QueryBuilder::new("");
         }
         
         let (names, values) = batch_extract::<ET, VAL>(&models, &[], false);
@@ -104,7 +106,7 @@ where
             }
         }
 
-        Ok(query_builder)
+        query_builder
     }
 
     /// Create single record upsert operation
@@ -114,7 +116,7 @@ where
     /// * `primary_key` - Primary key definition
     /// 
     /// # Returns
-    /// A QueryBuilder with the UPSERT query or an Error
+    /// A QueryBuilder with the UPSERT query
     /// 
     /// 创建单条记录更新插入操作
     /// 
@@ -123,11 +125,11 @@ where
     /// * `primary_key` - 主键定义
     /// 
     /// # 返回值
-    /// 包含 UPSERT 查询的 QueryBuilder 或错误
+    /// 包含 UPSERT 查询的 QueryBuilder
     pub fn one(
         model: &'a ET,
         primary_key: &PrimaryKey<'a>,
-    ) -> Result<QueryBuilder<'a, DB>, Error>
+    ) -> QueryBuilder<'a, DB>
     {
         Self::many(once(model), primary_key)
     }
