@@ -1,5 +1,5 @@
 pub fn init_logger() {
-    env_logger::init(); 
+    env_logger::init();
 }
 
 pub async fn get_database_url() -> String {

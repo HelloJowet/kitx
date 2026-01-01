@@ -20,11 +20,7 @@ pub struct Article {
 }
 
 impl Article {
-    pub fn new(
-        tenant_id: i32,
-        title: &str,
-        content: Option<String>,
-    ) -> Self {
+    pub fn new(tenant_id: i32, title: &str, content: Option<String>) -> Self {
         Article {
             tenant_id,
             title: title.to_string(),
@@ -46,9 +42,7 @@ pub struct ArticleTag {
 
 #[cfg(any(feature = "mysql", feature = "sqlite", feature = "postgres"))]
 impl ArticleTag {
-    pub fn new(
-        tag: &str,
-    ) -> Self {
+    pub fn new(tag: &str) -> Self {
         ArticleTag {
             tag: tag.to_string(),
             ..Default::default()

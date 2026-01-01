@@ -1,17 +1,15 @@
 use std::{iter::once, marker::PhantomData};
 
 use field_access::FieldAccess;
-use sqlx::{Database, Encode, QueryBuilder, Type};
 use log::error;
+use sqlx::{Database, Encode, QueryBuilder, Type};
 
-use crate::common::{
-    conversion::ValueConvert, fields::batch_extract, helper::get_table_name, types::PrimaryKey
-};
+use crate::common::{conversion::ValueConvert, fields::batch_extract, helper::get_table_name, types::PrimaryKey};
 
 /// INSERT 查询构建器
-/// 
+///
 /// 提供直观的 API 来构建 INSERT SQL 查询。
-/// 
+///
 /// # 类型参数
 /// * `ET` - 实现 FieldAccess trait 的实体类型
 /// * `DB` - 实现 sqlx::Database trait 的数据库类型
@@ -34,10 +32,10 @@ where
     VAL: Encode<'a, DB> + Type<DB> + ValueConvert + 'a,
 {
     /// 开始构建 INSERT 查询（使用实体的默认表名）
-    /// 
+    ///
     /// # 返回值
     /// 新的 Insert 构建器实例
-    /// 
+    ///
     /// # 示例
     /// ```
     /// let insert = Insert::<User, Postgres>::table();
@@ -48,10 +46,10 @@ where
     }
 
     /// 开始构建 INSERT 查询（指定表名）
-    /// 
+    ///
     /// # 参数
     /// * `table_name` - 要插入的表名
-    /// 
+    ///
     /// # 返回值
     /// 新的 Insert 构建器实例
     pub fn with_table(table_name: impl Into<String>) -> Self {
@@ -75,13 +73,13 @@ where
     }
 
     /// 指定要插入的列
-    /// 
+    ///
     /// # 参数
     /// * `columns` - 列名集合
-    /// 
+    ///
     /// # 返回值
     /// 更新后的构建器实例
-    pub fn columns<I, S>(mut self, columns: I) -> Self 
+    pub fn columns<I, S>(mut self, columns: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
@@ -100,107 +98,92 @@ where
     }
 
     /// Create multiple records insert operation
-    /// 
+    ///
     /// # Arguments
     /// * `models` - Collection of entity models to insert
     /// * `primary_key` - Primary key definition
-    /// 
+    ///
     /// # Returns
     /// A QueryBuilder with the INSERT query
-    /// 
+    ///
     /// 创建多条记录插入操作
-    /// 
+    ///
     /// # 参数
     /// * `models` - 要插入的实体模型集合
     /// * `primary_key` - 主键定义
-    /// 
+    ///
     /// # 返回值
     /// 包含 INSERT 查询的 QueryBuilder
-    pub fn many(
-        models: impl IntoIterator<Item = &'a ET>, 
-        primary_key: &PrimaryKey<'a>
-    ) -> QueryBuilder<'a, DB>
-    {
+    pub fn many(models: impl IntoIterator<Item = &'a ET>, primary_key: &PrimaryKey<'a>) -> QueryBuilder<'a, DB> {
         let models: Vec<_> = models.into_iter().collect();
         if models.is_empty() {
             error!("No entities provided for insert operation");
             return QueryBuilder::new("");
         }
 
-        let keys = if primary_key.auto_generate() {
-            primary_key.get_keys()
-        } else {
-            vec![]
-        };
+        let keys = if primary_key.auto_generate() { primary_key.get_keys() } else { vec![] };
         let (names, values) = batch_extract::<ET, VAL>(&models, &keys, false);
         let mut query_builder = Self::table().query_builder;
         query_builder.push(" (").push(names.join(", ")).push(") ");
-        query_builder.push_values(
-            values,
-            |mut b, row| {
-                for value in row {
-                    b.push_bind(value);
-                }
+        query_builder.push_values(values, |mut b, row| {
+            for value in row {
+                b.push_bind(value);
             }
-        );
+        });
 
         query_builder
     }
 
     /// Create single record insert operation
-    /// 
+    ///
     /// # Arguments
     /// * `model` - Entity model to insert
     /// * `primary_key` - Primary key definition
-    /// 
+    ///
     /// # Returns
     /// A QueryBuilder with the INSERT query
-    /// 
+    ///
     /// 创建单条记录插入操作
-    /// 
+    ///
     /// # 参数
     /// * `model` - 要插入的实体模型
     /// * `primary_key` - 主键定义
-    /// 
+    ///
     /// # 返回值
     /// 包含 INSERT 查询的 QueryBuilder
-    pub fn one(
-        model: &'a ET,
-        primary_key: &PrimaryKey<'a>,
-    ) -> QueryBuilder<'a, DB>
-    {
+    pub fn one(model: &'a ET, primary_key: &PrimaryKey<'a>) -> QueryBuilder<'a, DB> {
         Self::many(once(model), primary_key)
     }
 
     /// 添加 RETURNING 子句
-    /// 
+    ///
     /// # 参数
     /// * `columns` - 要返回的列
-    /// 
+    ///
     /// # 返回值
     /// 更新后的构建器实例
-    #[cfg(any(feature = "sqlite" , feature = "postgres"))]
+    #[cfg(any(feature = "sqlite", feature = "postgres"))]
     pub fn returning<I, S>(mut self, columns: I) -> Self
     where
         I: IntoIterator<Item = S>,
         S: AsRef<str>,
     {
         self.query_builder.push(" RETURNING ");
-        
+
         let cols = columns.into_iter();
         let mut separated = self.query_builder.separated(", ");
         for col in cols {
             separated.push(col.as_ref());
         }
-        
+
         self
     }
 
     /// 添加自定义查询部分
-    /// 
+    ///
     /// # 参数
     /// * `build_fn` - 自定义构建函数
-    /// 
+    ///
     /// # 返回值
     /// 更新后的构建器实例
     pub fn custom<F>(mut self, build_fn: F) -> Self
@@ -212,7 +195,7 @@ where
     }
 
     /// 构建最终的查询
-    /// 
+    ///
     /// # 返回值
     /// QueryBuilder 实例
     pub fn finish(self) -> QueryBuilder<'a, DB> {

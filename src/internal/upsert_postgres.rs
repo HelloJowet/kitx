@@ -1,26 +1,24 @@
 use std::marker::PhantomData;
 
 use field_access::FieldAccess;
-use sqlx::{Database, Encode, QueryBuilder, Type};
 use log::error;
+use sqlx::{Database, Encode, QueryBuilder, Type};
 
-use crate::common::{
-    conversion::{ValueConvert}, fields::batch_extract, helper::get_table_name, types::PrimaryKey
-};
+use crate::common::{conversion::ValueConvert, fields::batch_extract, helper::get_table_name, types::PrimaryKey};
 
 /// PostgreSQL Upsert query builder
-/// 
+///
 /// This struct provides functionality to build PostgreSQL-specific UPSERT (INSERT ... ON CONFLICT) SQL queries.
-/// 
+///
 /// # Type Parameters
 /// * `ET` - Entity type that implements FieldAccess trait
 /// * `DB` - Database type that implements sqlx::Database trait
 /// * `VAL` - Value type that implements Encode, Type, and ValueConvert traits
-/// 
+///
 /// PostgreSQL 更新插入查询构建器
-/// 
+///
 /// 该结构体提供了构建 PostgreSQL 特定的 UPSERT (INSERT ... ON CONFLICT) SQL 查询的功能。
-/// 
+///
 /// # 类型参数
 /// * `ET` - 实现 FieldAccess trait 的实体类型
 /// * `DB` - 实现 sqlx::Database trait 的数据库类型
@@ -40,60 +38,48 @@ where
     DB: Database,
     VAL: Encode<'a, DB> + Type<DB> + ValueConvert + 'a,
 {
-
     /// Create multiple records upsert operation
-    /// 
+    ///
     /// # Arguments
     /// * `models` - Collection of entity models to upsert
     /// * `primary_key` - Primary key definition
-    /// 
+    ///
     /// # Returns
     /// A QueryBuilder with the UPSERT query
-    /// 
+    ///
     /// 创建多条记录更新插入操作
-    /// 
+    ///
     /// # 参数
     /// * `models` - 要更新插入的实体模型集合
     /// * `primary_key` - 主键定义
-    /// 
+    ///
     /// # 返回值
     /// 包含 UPSERT 查询的 QueryBuilder
-    pub fn many(
-        models: impl IntoIterator<Item = &'a ET>,
-        primary_key: &PrimaryKey<'a>,
-    ) -> QueryBuilder<'a, DB> {
-       
+    pub fn many(models: impl IntoIterator<Item = &'a ET>, primary_key: &PrimaryKey<'a>) -> QueryBuilder<'a, DB> {
         let models: Vec<_> = models.into_iter().collect();
         if models.is_empty() {
             error!("No entities provided for upsert operation");
             return QueryBuilder::new("");
         }
-        
+
         let (names, values) = batch_extract::<ET, VAL>(&models, &[], false);
         let keys = primary_key.get_keys();
         let table_name = get_table_name::<ET>();
-        
-        let mut query_builder = QueryBuilder::new(
-            format!("INSERT INTO {} ({}) ", table_name, names.join(", "))
-        );
 
-        query_builder.push_values(
-            values,
-            | mut b, row| {
-                for (i, value) in row.into_iter().enumerate() {
-                    if keys.contains(&names[i]) && VAL::is_default_value(&value) {
-                        b.push(" DEFAULT ");
-                    } else {
-                        b.push_bind(value);
-                    }
+        let mut query_builder = QueryBuilder::new(format!("INSERT INTO {} ({}) ", table_name, names.join(", ")));
+
+        query_builder.push_values(values, |mut b, row| {
+            for (i, value) in row.into_iter().enumerate() {
+                if keys.contains(&names[i]) && VAL::is_default_value(&value) {
+                    b.push(" DEFAULT ");
+                } else {
+                    b.push_bind(value);
                 }
             }
-        );
-        
+        });
+
         if !keys.is_empty() {
-            query_builder.push(" ON CONFLICT (")
-                    .push(keys.join(", "))
-                    .push(") DO UPDATE SET ");
+            query_builder.push(" ON CONFLICT (").push(keys.join(", ")).push(") DO UPDATE SET ");
 
             let mut first = true;
             for name in &names {
@@ -109,27 +95,23 @@ where
     }
 
     /// Create single record upsert operation
-    /// 
+    ///
     /// # Arguments
     /// * `model` - Entity model to upsert
     /// * `primary_key` - Primary key definition
-    /// 
+    ///
     /// # Returns
     /// A QueryBuilder with the UPSERT query
-    /// 
+    ///
     /// 创建单条记录更新插入操作
-    /// 
+    ///
     /// # 参数
     /// * `model` - 要更新插入的实体模型
     /// * `primary_key` - 主键定义
-    /// 
+    ///
     /// # 返回值
     /// 包含 UPSERT 查询的 QueryBuilder
-    pub fn one(
-        model: &'a ET,
-        primary_key: &PrimaryKey<'a>,
-    ) -> QueryBuilder<'a, DB>
-    {
+    pub fn one(model: &'a ET, primary_key: &PrimaryKey<'a>) -> QueryBuilder<'a, DB> {
         Self::many(std::iter::once(model), primary_key)
     }
 }

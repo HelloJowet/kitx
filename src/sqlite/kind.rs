@@ -1,28 +1,28 @@
 //! Data type definitions and conversions for SQLite database operations.
-//! 
+//!
 //! This module provides the [DataKind] enumeration which represents various database field types
 //! supported by SQLite, along with their encoding and type conversion implementations. It handles
 //! the mapping between Rust types and SQLite data types, including text, integer, real, blob,
 //! date/time, boolean, JSON, and UUID types.
-//! 
+//!
 //! SQLite 数据库操作的数据类型定义和转换。
-//! 
+//!
 //! 本模块提供了 [DataKind] 枚举，用于表示 SQLite 支持的各种数据库字段类型，
 //! 并包含它们的编码和类型转换实现。它处理 Rust 类型和 SQLite 数据类型之间的映射，
 //! 包括文本、整数、实数、二进制数据、日期/时间、布尔值、JSON 和 UUID 类型。
 
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
+use serde_json::Value;
+use sqlx::encode::IsNull;
+use sqlx::sqlite::SqliteArgumentValue;
+use sqlx::types::Uuid;
+use sqlx::{Database, Encode, Sqlite, Type};
 use std::any::Any;
 use std::borrow::Cow;
 use std::error::Error;
 use std::sync::Arc;
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
-use serde_json::Value;
-use sqlx::encode::IsNull;
-use sqlx::types::Uuid;
-use sqlx::{Database, Encode, Sqlite, Type};
-use sqlx::sqlite::SqliteArgumentValue;
 
-use crate::common::conversion::{unwrap_option, ValueConvert};
+use crate::common::conversion::{ValueConvert, unwrap_option};
 
 /// Enum representing different types of database field values.
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -39,8 +39,8 @@ pub enum DataKind {
     /// Date and time types
     DateTime(NaiveDateTime), // SQLite: DATETIME (TEXT, INTEGER, REAL)
     DateTimeUtc(DateTime<Utc>), // SQLite: DATETIME (TEXT, INTEGER, REAL)
-    Date(NaiveDate), // SQLite: DATE (TEXT only)
-    Time(NaiveTime), // SQLite: TIME (TEXT only)
+    Date(NaiveDate),            // SQLite: DATE (TEXT only)
+    Time(NaiveTime),            // SQLite: TIME (TEXT only)
 
     /// BLOB type (byte array) - stored as Arc<[u8]> for zero-copy cloning
     Blob(Arc<[u8]>), // SQLite: BLOB
@@ -72,7 +72,7 @@ impl Encode<'_, Sqlite> for DataKind {
             DataKind::DateTime(dt) => {
                 let utc_datetime = Utc.from_utc_datetime(dt);
                 <String as Encode<'_, Sqlite>>::encode(utc_datetime.to_rfc3339(), buf)
-            },
+            }
             DataKind::DateTimeUtc(dt_utc) => <String as Encode<'_, Sqlite>>::encode(dt_utc.to_rfc3339(), buf),
             DataKind::Date(date) => <String as Encode<'_, Sqlite>>::encode(date.format("%Y-%m-%d").to_string(), buf),
             DataKind::Time(time) => <String as Encode<'_, Sqlite>>::encode(time.format("%H:%M:%S%.f").to_string(), buf),
@@ -86,10 +86,9 @@ impl Encode<'_, Sqlite> for DataKind {
             DataKind::Bool(b) => <i64 as Encode<'_, Sqlite>>::encode(*b as i64, buf),
 
             DataKind::Json(json) => {
-                let json_str = serde_json::to_string(json.as_ref())
-                    .map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync + 'static>)?;
+                let json_str = serde_json::to_string(json.as_ref()).map_err(|e| Box::new(e) as Box<dyn Error + Send + Sync + 'static>)?;
                 <String as Encode<'_, Sqlite>>::encode(json_str, buf)
-            },
+            }
 
             // UUID type
             DataKind::Uuid(uuid) => <String as Encode<'_, Sqlite>>::encode(uuid.to_string(), buf),
@@ -121,10 +120,10 @@ impl ValueConvert for DataKind {
         try_convert!(
             String => |v: &String| DataKind::Text(v.to_string()),
             &str => |v: &&str| DataKind::Text((*v).to_string()),
-            i32 => |v: &i32| DataKind::Integer(*v as i64),            
+            i32 => |v: &i32| DataKind::Integer(*v as i64),
             u32 => |v: &u32| DataKind::Integer(*v as i64),
             u64 => |v: &u64| DataKind::Integer(*v as i64),
-            i64 => |v: &i64| DataKind::Integer(*v),            
+            i64 => |v: &i64| DataKind::Integer(*v),
             f32 => |v: &f32| DataKind::Real(*v as f64),
             f64 => |v: &f64| DataKind::Real(*v),
             bool => |v: &bool| DataKind::Bool(*v),

@@ -1,29 +1,29 @@
 //! Data type definitions and conversions for MySQL and MariaDB database operations.
-//! 
+//!
 //! This module provides the [DataKind] enumeration which represents various database field types
-//! supported by MySQL and MariaDB, along with their encoding and type conversion implementations. 
-//! It handles the mapping between Rust types and MySQL/MariaDB data types, including numeric, 
+//! supported by MySQL and MariaDB, along with their encoding and type conversion implementations.
+//! It handles the mapping between Rust types and MySQL/MariaDB data types, including numeric,
 //! string, binary, temporal, JSON, UUID, and IP address types.
-//! 
+//!
 //! MySQL 和 MariaDB 数据库操作的数据类型定义和转换。
-//! 
+//!
 //! 本模块提供了 [DataKind] 枚举，用于表示 MySQL 和 MariaDB 支持的各种数据库字段类型，
 //! 并包含它们的编码和类型转换实现。它处理 Rust 类型和 MySQL/MariaDB 数据类型之间的映射，
 //! 包括数值、字符串、二进制、时间、JSON、UUID 和 IP 地址类型。
 
-use std::borrow::Cow;
-use std::error::Error;
-use std::sync::Arc;
-use std::any::Any;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
+use serde_json::Value;
 use sqlx::encode::IsNull;
 use sqlx::mysql::{MySql, MySqlTypeInfo};
-use sqlx::{Encode, Type, TypeInfo};
 use sqlx::types::{Decimal, Uuid};
-use serde_json::Value;
+use sqlx::{Encode, Type, TypeInfo};
+use std::any::Any;
+use std::borrow::Cow;
+use std::error::Error;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::sync::Arc;
 
-use crate::common::conversion::{unwrap_option, ValueConvert};
+use crate::common::conversion::{ValueConvert, unwrap_option};
 
 /// Enum representing PostgreSQL data types, supporting the main PostgreSQL type system
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -34,44 +34,44 @@ pub enum DataKind {
     Bool(bool), // TINYINT(1), BOOLEAN, BOOL
 
     // Numeric types
-    TinyInt(i8),          // TINYINT
-    SmallInt(i16),        // SMALLINT
-    Int(i32),             // INT
-    BigInt(i64),          // BIGINT
-    UnsignedTinyInt(u8),  // TINYINT UNSIGNED
-    UnsignedSmallInt(u16),// SMALLINT UNSIGNED
-    UnsignedInt(u32),     // INT UNSIGNED
-    UnsignedBigInt(u64),  // BIGINT UNSIGNED
-    Float(f32),           // FLOAT
-    Double(f64),          // DOUBLE
+    TinyInt(i8),           // TINYINT
+    SmallInt(i16),         // SMALLINT
+    Int(i32),              // INT
+    BigInt(i64),           // BIGINT
+    UnsignedTinyInt(u8),   // TINYINT UNSIGNED
+    UnsignedSmallInt(u16), // SMALLINT UNSIGNED
+    UnsignedInt(u32),      // INT UNSIGNED
+    UnsignedBigInt(u64),   // BIGINT UNSIGNED
+    Float(f32),            // FLOAT
+    Double(f64),           // DOUBLE
 
     // Decimal types
-    Decimal(Decimal),  // DECIMAL
+    Decimal(Decimal), // DECIMAL
 
     // String types
-    Text(String),   // VARCHAR, CHAR, TEXT
+    Text(String), // VARCHAR, CHAR, TEXT
 
     // Binary types
-    Blob(Arc<[u8]>),  // VARBINARY, BINARY, BLOB
+    Blob(Arc<[u8]>), // VARBINARY, BINARY, BLOB
 
     // Time types
-    Date(NaiveDate),      // DATE
-    Time(NaiveTime),      // TIME (time-of-day only)
-    DateTime(NaiveDateTime), // DATETIME
+    Date(NaiveDate),          // DATE
+    Time(NaiveTime),          // TIME (time-of-day only)
+    DateTime(NaiveDateTime),  // DATETIME
     Timestamp(DateTime<Utc>), // TIMESTAMP
 
     // Special types
-    Json(Arc<Value>),          // JSON (both MySQL 5.7+ and MariaDB 10.2+)
-    
+    Json(Arc<Value>), // JSON (both MySQL 5.7+ and MariaDB 10.2+)
+
     // UUID support - stored as BINARY(16) in both MySQL and MariaDB
     // Note: MariaDB 10.7+ has native UUID type, but sqlx uses BINARY(16) for compatibility
     Uuid(Uuid),
-    
+
     // IP Address types - stored as string for maximum compatibility
     // Note: While MariaDB has native INET4/INET6 types, they're not yet fully supported by sqlx
-    IpAddr(IpAddr),       // Stored as VARCHAR for compatibility
-    Ipv4Addr(Ipv4Addr),   // Stored as VARCHAR or can be optimized to INT UNSIGNED
-    Ipv6Addr(Ipv6Addr),   // Stored as VARCHAR or BINARY(16)
+    IpAddr(IpAddr),     // Stored as VARCHAR for compatibility
+    Ipv4Addr(Ipv4Addr), // Stored as VARCHAR or can be optimized to INT UNSIGNED
+    Ipv6Addr(Ipv6Addr), // Stored as VARCHAR or BINARY(16)
 }
 
 impl Encode<'_, MySql> for DataKind {
@@ -111,13 +111,12 @@ impl Encode<'_, MySql> for DataKind {
             // Special types
             DataKind::Json(json) => {
                 let owned_json = Arc::clone(&json);
-                <Value as Encode<'_, MySql>>::encode(Arc::try_unwrap(owned_json)
-                    .unwrap_or_else(|arc| (*arc).clone()), buf)
-            },
-            
+                <Value as Encode<'_, MySql>>::encode(Arc::try_unwrap(owned_json).unwrap_or_else(|arc| (*arc).clone()), buf)
+            }
+
             // UUID - encoded as BINARY(16) for both MySQL and MariaDB
             DataKind::Uuid(u) => <Uuid as Encode<'_, MySql>>::encode(*u, buf),
-            
+
             // IP Address - stored as string for compatibility
             DataKind::IpAddr(ip) => <String as Encode<'_, MySql>>::encode(ip.to_string(), buf),
             DataKind::Ipv4Addr(ipv4) => <String as Encode<'_, MySql>>::encode(ipv4.to_string(), buf),
@@ -188,7 +187,7 @@ impl DataKind {
             // Special types
             DataKind::Json(_) => <Value as Type<MySql>>::type_info(),
             DataKind::Uuid(_) => <Uuid as Type<MySql>>::type_info(),
-            
+
             // IP Address types - all use string type info for compatibility
             DataKind::IpAddr(_) => <String as Type<MySql>>::type_info(),
             DataKind::Ipv4Addr(_) => <String as Type<MySql>>::type_info(),
@@ -290,7 +289,6 @@ impl_from!(Uuid, DataKind::Uuid);
 impl_from!(IpAddr, DataKind::IpAddr);
 impl_from!(Ipv4Addr, DataKind::Ipv4Addr);
 impl_from!(Ipv6Addr, DataKind::Ipv6Addr);
-
 
 impl<'a> From<DataKind> for Cow<'a, DataKind> {
     fn from(value: DataKind) -> Self {

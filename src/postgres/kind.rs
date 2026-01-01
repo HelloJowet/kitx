@@ -1,31 +1,31 @@
 //! Data type definitions and conversions for PostgreSQL database operations.
-//! 
+//!
 //! This module provides the [DataKind] enumeration which represents various database field types
 //! supported by PostgreSQL, along with their encoding and type conversion implementations. It handles
 //! the mapping between Rust types and PostgreSQL data types, including numeric, string, binary,
 //! date/time, network, UUID, and JSON types.
-//! 
+//!
 //! PostgreSQL 数据库操作的数据类型定义和转换。
-//! 
+//!
 //! 本模块提供了 [DataKind] 枚举，用于表示 PostgreSQL 支持的各种数据库字段类型，
 //! 并包含它们的编码和类型转换实现。它处理 Rust 类型和 PostgreSQL 数据类型之间的映射，
 //! 包括数值、字符串、二进制、日期/时间、网络、UUID 和 JSON 类型。
 
-use std::any::Any;
-use std::error::Error;
-use std::sync::Arc;
-use std::net::IpAddr;
 use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, Utc};
 use mac_address::MacAddress;
+use serde_json::Value;
 use sqlx::encode::IsNull;
 use sqlx::postgres::{PgArgumentBuffer, PgHasArrayType, PgTypeInfo, Postgres};
 use sqlx::types::uuid;
-use sqlx::{Encode, Type, TypeInfo};
 use sqlx::types::{Decimal, ipnetwork::IpNetwork};
-use serde_json::Value;
+use sqlx::{Encode, Type, TypeInfo};
+use std::any::Any;
+use std::error::Error;
+use std::net::IpAddr;
+use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::common::conversion::{unwrap_option, ValueConvert};
+use crate::common::conversion::{ValueConvert, unwrap_option};
 
 /// Enum representing PostgreSQL data types, supporting the main PostgreSQL type system
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -36,36 +36,36 @@ pub enum DataKind {
     Bool(bool),
 
     // Numeric types
-    Int2(i16),              // SMALLINT, SMALLSERIAL, INT2
-    Int4(i32),              // INT, SERIAL, INT4
-    Int8(i64),              // BIGINT, BIGSERIAL, INT8
-    Float4(f32),            // REAL, FLOAT4
-    Float8(f64),            // DOUBLE PRECISION, FLOAT8
-    Numeric(Decimal),    // NUMERIC
+    Int2(i16),        // SMALLINT, SMALLSERIAL, INT2
+    Int4(i32),        // INT, SERIAL, INT4
+    Int8(i64),        // BIGINT, BIGSERIAL, INT8
+    Float4(f32),      // REAL, FLOAT4
+    Float8(f64),      // DOUBLE PRECISION, FLOAT8
+    Numeric(Decimal), // NUMERIC
 
     // String types
-    Text(String),     // VARCHAR, CHAR(N), TEXT, NAME, CITEXT
+    Text(String), // VARCHAR, CHAR(N), TEXT, NAME, CITEXT
 
     // Binary types
-    Bytea(Arc<[u8]>),   // BYTEA
+    Bytea(Arc<[u8]>), // BYTEA
 
     // Date and time types
-    Date(NaiveDate),        // DATE
-    Time(NaiveTime),        // TIME
-    Timestamp(NaiveDateTime), // TIMESTAMP
+    Date(NaiveDate),            // DATE
+    Time(NaiveTime),            // TIME
+    Timestamp(NaiveDateTime),   // TIMESTAMP
     Timestamptz(DateTime<Utc>), // TIMESTAMPTZ
-    Interval(Duration), // INTERVAL
+    Interval(Duration),         // INTERVAL
 
     // Network types
     Inet(IpAddr),        // INET
-    Cidr(IpNetwork),        // CIDR
-    MacAddr(MacAddress),    // MACADDR
+    Cidr(IpNetwork),     // CIDR
+    MacAddr(MacAddress), // MACADDR
 
     // UUID type
-    Uuid(Uuid),             // UUID
+    Uuid(Uuid), // UUID
 
     // JSON types
-    Json(Arc<Value>),    // JSON, JSONB
+    Json(Arc<Value>), // JSON, JSONB
 }
 
 impl Encode<'_, Postgres> for DataKind {
@@ -90,7 +90,7 @@ impl Encode<'_, Postgres> for DataKind {
             DataKind::Cidr(cidr) => <IpNetwork as Encode<'_, Postgres>>::encode(*cidr, buf),
             DataKind::MacAddr(mac) => <[u8; 6] as Encode<'_, Postgres>>::encode(mac.bytes(), buf),
             DataKind::Uuid(uuid) => <Uuid as Encode<'_, Postgres>>::encode(*uuid, buf),
-            DataKind::Json(j) => <&Value as Encode<'_, Postgres>>::encode(j, buf),            
+            DataKind::Json(j) => <&Value as Encode<'_, Postgres>>::encode(j, buf),
         }
     }
 
@@ -107,11 +107,27 @@ impl Type<Postgres> for DataKind {
     fn compatible(ty: &PgTypeInfo) -> bool {
         matches!(
             ty.name(),
-            "BOOL" | "INT2" | "INT4" | "INT8" | "FLOAT4" | "FLOAT8" | "NUMERIC"
-            | "TEXT" | "BYTEA"
-            | "DATE" | "TIME" | "TIMESTAMP" | "TIMESTAMPTZ" | "INTERVAL"
-            | "INET" | "CIDR" | "MACADDR" | "UUID"
-            | "JSON" | "JSONB" | "NULL"
+            "BOOL"
+                | "INT2"
+                | "INT4"
+                | "INT8"
+                | "FLOAT4"
+                | "FLOAT8"
+                | "NUMERIC"
+                | "TEXT"
+                | "BYTEA"
+                | "DATE"
+                | "TIME"
+                | "TIMESTAMP"
+                | "TIMESTAMPTZ"
+                | "INTERVAL"
+                | "INET"
+                | "CIDR"
+                | "MACADDR"
+                | "UUID"
+                | "JSON"
+                | "JSONB"
+                | "NULL"
         )
     }
 }
@@ -149,7 +165,7 @@ impl PgHasArrayType for DataKind {
     }
 }
 
-impl ValueConvert for DataKind {    
+impl ValueConvert for DataKind {
     fn convert(value: &dyn Any) -> Self {
         macro_rules! try_convert {
             ($($type:ty => $variant:expr),*) => {
