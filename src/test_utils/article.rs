@@ -65,6 +65,7 @@ impl ArticleTag {
 pub mod mysql {
     use super::*;
 
+    // TODO: support Enums for MySQL
     #[derive(Debug, Serialize, Deserialize, Default, FromRow, FieldAccess, Clone, PartialEq, Hash)]
     pub struct Article {
         pub id: i32,
