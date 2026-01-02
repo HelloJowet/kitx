@@ -235,6 +235,23 @@ For query statement error messages, use log::error for output. Handle these in c
 
 ---
 
+### 🧪 Running Tests
+
+To run the integration tests, you need to start the database services. We provide a Docker Compose configuration for this purpose.
+
+```bash
+# Start MySQL (port 10000) and PostgreSQL (port 10001)
+docker compose up -d
+```
+
+Once the databases are up, you can run the tests:
+
+```bash
+cargo test
+```
+
+---
+
 💡 **Note**:  
 > Kitx breaks down SQL statements into segments (e.g., `"SELECT {} FROM {} WHERE {}"`) and auto-fills placeholders using entity model data. When automatic filling isn't enough, use manual closures (`fn(QueryBuilder)`) for aliases, joins, or nested conditions.  
 
@@ -303,3 +320,6 @@ For query statement error messages, use log::error for output. Handle these in c
 [返回顶部 ⬆️](#readme-中文) | [Back to Top ⬆️](#readme)
 
 </div>
+
+---
+
