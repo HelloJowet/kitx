@@ -358,7 +358,7 @@ mod tests {
             kind::DataKind,
             query::{execute, fetch_all, fetch_one, fetch_scalar},
         },
-        test_utils::{article::Article, init::init_logger},
+        test_utils::{article::mysql::Article, init::init_logger},
     };
     //use super::*;
     async fn init_pool() {

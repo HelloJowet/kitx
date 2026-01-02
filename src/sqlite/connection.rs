@@ -67,7 +67,7 @@ pub async fn create_db_pool(database_url: &str) -> Result<&SqlitePool, Error> {
     let connect_options = SqliteConnectOptions::from_str(database_url)
         .map_err(|e| Error::from(e))?
         .create_if_missing(true)
-        .journal_mode(SqliteJournalMode::Wal)
+        .journal_mode(SqliteJournalMode::Delete)
         .synchronous(SqliteSynchronous::Normal)
         .busy_timeout(Duration::from_secs(8));
 

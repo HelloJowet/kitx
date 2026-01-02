@@ -2,6 +2,8 @@ use std::marker::PhantomData;
 
 use field_access::FieldAccess;
 use log::error;
+use serde::Serialize;
+use serde_json::Value;
 use sqlx::{Database, Encode, Error, QueryBuilder, Type};
 
 use crate::common::{conversion::ValueConvert, fields::extract_with_bind, filter::push_primary_key_conditions, helper::get_table_name, types::PrimaryKey};
@@ -38,7 +40,7 @@ where
 /// 创建 UPDATE + SET + WHERE 查询
 impl<'a, ET, DB, VAL> Update<'a, ET, DB, VAL>
 where
-    ET: FieldAccess,
+    ET: FieldAccess + Serialize,
     DB: Database,
     VAL: Encode<'a, DB> + Type<DB> + 'a,
 {
@@ -116,14 +118,14 @@ where
     /// 包含 UPDATE 查询的 QueryBuilder 或错误
     pub fn one(model: &'a ET, primary_key: &PrimaryKey<'a>, skip_non_null: bool) -> Result<QueryBuilder<'a, DB>, Error>
     where
-        VAL: Encode<'a, DB> + Type<DB> + ValueConvert + Default + 'a,
+        VAL: Encode<'a, DB> + Type<DB> + ValueConvert + From<Value> + Clone + Default + 'a,
     {
         let keys = primary_key.clone();
         let filter_keys = if primary_key.auto_generate() { primary_key.get_keys() } else { vec![] };
 
         let mut query_builder = Self::table().query_builder;
         let mut first = true;
-        let fields = extract_with_bind::<VAL, _>(model.fields(), &filter_keys, skip_non_null, |name, value| {
+        let fields = extract_with_bind::<ET, VAL, _>(model, &filter_keys, skip_non_null, |name, value| {
             if !first {
                 query_builder.push(", ");
             }

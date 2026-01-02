@@ -5,7 +5,8 @@ CREATE TABLE article (
     content TEXT,
     views INTEGER DEFAULT 0,
     deleted INTEGER DEFAULT 0 CHECK(deleted IN (0, 1)),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    status TEXT NOT NULL DEFAULT 'draft'
 );
 CREATE TABLE article_tag (
     article_id INTEGER NOT NULL,

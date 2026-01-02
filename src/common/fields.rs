@@ -12,6 +12,8 @@
 //! 这些工具对于构建动态SQL查询和参数绑定至关重要。
 
 use field_access::{FieldAccess, Fields};
+use serde::Serialize;
+use serde_json::Value;
 
 use super::conversion::{ValueConvert, is_empty_or_none};
 
@@ -153,15 +155,17 @@ where
 ///     }
 /// );
 /// ```
-pub fn extract_with_bind<VAL, F>(fields: Fields, filter_columns: &[&str], skip_non_null: bool, mut bind_fn: F) -> (Vec<&'static str>, Vec<VAL>)
+pub fn extract_with_bind<ET, VAL, F>(entity: &ET, filter_columns: &[&str], skip_non_null: bool, mut bind_fn: F) -> (Vec<&'static str>, Vec<VAL>)
 where
-    VAL: ValueConvert,
+    ET: FieldAccess + Serialize,
+    VAL: ValueConvert + From<Value> + Clone,
     F: FnMut(&str, VAL),
 {
     let mut cols_names = Vec::new();
     let mut cols_values = Vec::new();
+    let mut json_value: Option<Value> = None;
 
-    for (name, field) in fields {
+    for (name, field) in entity.fields() {
         if filter_columns.contains(&name) {
             continue;
         }
@@ -170,9 +174,29 @@ where
         if skip_non_null && is_empty_or_none(any_value) {
             continue;
         }
+
+        let val = if let Some(v) = VAL::try_convert(any_value) {
+            v
+        } else {
+            // Fallback to Serde
+            if json_value.is_none() {
+                json_value = serde_json::to_value(entity).ok();
+            }
+
+            if let Some(Value::Object(map)) = &json_value {
+                if let Some(v) = map.get(name) {
+                    VAL::from(v.clone())
+                } else {
+                    VAL::convert(any_value) // Fallback to Null via standard convert
+                }
+            } else {
+                VAL::convert(any_value)
+            }
+        };
+
         cols_names.push(name);
-        cols_values.push(VAL::convert(any_value));
-        bind_fn(name, VAL::convert(any_value));
+        cols_values.push(val.clone());
+        bind_fn(name, val);
     }
     (cols_names, cols_values)
 }
@@ -239,11 +263,12 @@ where
 ///     true
 /// );
 /// ```
-pub fn extract_with_filter<VAL>(fields: Fields, filter_columns: &[&str], skip_non_null: bool) -> (Vec<&'static str>, Vec<VAL>)
+pub fn extract_with_filter<ET, VAL>(entity: &ET, filter_columns: &[&str], skip_non_null: bool) -> (Vec<&'static str>, Vec<VAL>)
 where
-    VAL: ValueConvert,
+    ET: FieldAccess + Serialize,
+    VAL: ValueConvert + From<Value> + Clone,
 {
-    extract_with_bind::<VAL, _>(fields, filter_columns, skip_non_null, |_, _| {})
+    extract_with_bind::<ET, VAL, _>(entity, filter_columns, skip_non_null, |_, _| {})
 }
 
 /// Extract field data from multiple entities for batch operations.
@@ -317,14 +342,14 @@ where
 /// ```
 pub fn batch_extract<ET, VAL>(entities: &[&ET], filter_columns: &[&str], skip_non_null: bool) -> (Vec<&'static str>, Vec<Vec<VAL>>)
 where
-    ET: FieldAccess,
-    VAL: ValueConvert,
+    ET: FieldAccess + Serialize,
+    VAL: ValueConvert + From<Value> + Clone,
 {
     let mut entities_names = Vec::new();
     let mut entities_values = Vec::with_capacity(entities.len());
 
     for entity in entities {
-        let value = extract_with_filter::<VAL>(entity.fields(), filter_columns, skip_non_null);
+        let value = extract_with_filter::<ET, VAL>(entity, filter_columns, skip_non_null);
         let (names, values) = value;
         if entities_names.is_empty() {
             entities_names = names;

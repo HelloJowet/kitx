@@ -40,7 +40,7 @@ use std::any::Any;
 /// ## 安全性
 ///
 /// 实现应该优雅地处理类型转换错误，并在转换失败时提供合理的默认值。
-pub trait ValueConvert {
+pub trait ValueConvert: Sized {
     /// Converts a dynamic value reference to the implementing type.
     ///
     /// # Parameters
@@ -61,7 +61,15 @@ pub trait ValueConvert {
     /// # 返回值
     ///
     /// 从输入值构造的实现类型的实例
-    fn convert(value: &dyn Any) -> Self;
+    /// Converts a dynamic value reference to the implementing type.
+    /// Returns None if the type is not supported.
+    fn try_convert(value: &dyn Any) -> Option<Self>;
+
+    fn convert(value: &dyn Any) -> Self {
+        Self::try_convert(value).unwrap_or_else(|| {
+            panic!("Conversion failed: ValueConvert::convert cannot handle the given value. Use try_convert for fallible conversion.");
+        })
+    }
 
     /// Checks if a value represents a default primary key value.
     ///

@@ -107,13 +107,12 @@ impl Type<Sqlite> for DataKind {
 }
 
 impl ValueConvert for DataKind {
-    fn convert(value: &dyn Any) -> Self {
+    fn try_convert(value: &dyn Any) -> Option<Self> {
         macro_rules! try_convert {
             ($($type:ty => $variant:expr),*) => {
                 $(if let Some(v) = unwrap_option::<$type>(value) {
-                    return $variant(v);
+                    return Some($variant(v));
                 })*
-                return DataKind::Null;
             };
         }
 
@@ -133,9 +132,29 @@ impl ValueConvert for DataKind {
             NaiveTime => |v: &NaiveTime| DataKind::Time(*v),
             Vec<u8> => |v: &Vec<u8>| DataKind::Blob(Arc::from(&**v)),
             &[u8] => |v: &&[u8]| DataKind::Blob(Arc::from(*v)),
-            Value => |v: &Value| DataKind::Json(Arc::new(v.clone())),
+            Value => |v: &Value| match v {
+                Value::String(s) => DataKind::Text(s.clone()),
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        DataKind::Integer(i)
+                    } else if let Some(f) = n.as_f64() {
+                        DataKind::Real(f)
+                    } else {
+                        DataKind::Json(Arc::new(v.clone()))
+                    }
+                },
+                Value::Bool(b) => DataKind::Bool(*b),
+                Value::Null => DataKind::Null,
+                _ => DataKind::Json(Arc::new(v.clone())),
+            },
             Uuid => |v: &Uuid| DataKind::Uuid(*v)
         );
+
+        None
+    }
+
+    fn convert(value: &dyn Any) -> Self {
+        Self::try_convert(value).unwrap_or(DataKind::Null)
     }
 
     fn is_default_value(value: &Self) -> bool {
@@ -183,7 +202,25 @@ impl_from!(NaiveDate, DataKind::Date);
 impl_from!(NaiveTime, DataKind::Time);
 
 // Special types
-impl_from!(Value, |value: Value| DataKind::Json(Arc::new(value)));
+impl From<Value> for DataKind {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::String(s) => DataKind::Text(s),
+            Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    DataKind::Integer(i)
+                } else if let Some(f) = n.as_f64() {
+                    DataKind::Real(f)
+                } else {
+                    DataKind::Json(Arc::new(Value::Number(n)))
+                }
+            }
+            Value::Bool(b) => DataKind::Bool(b),
+            Value::Null => DataKind::Null,
+            _ => DataKind::Json(Arc::new(value)),
+        }
+    }
+}
 impl_from!(Uuid, DataKind::Uuid);
 
 impl<'a> From<DataKind> for Cow<'a, DataKind> {

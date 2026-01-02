@@ -5,7 +5,8 @@ CREATE TABLE article (
     content TEXT,
     views INTEGER DEFAULT 0,
     deleted BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(255) NOT NULL DEFAULT 'draft'
 );
 
 CREATE TABLE article_tag (

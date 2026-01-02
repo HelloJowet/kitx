@@ -365,12 +365,16 @@ mod tests {
             kind::DataKind,
             query::{execute, fetch_all, fetch_one, fetch_scalar},
         },
-        test_utils::{article::Article, init::init_logger},
+        test_utils::{
+            article::{Article, Status},
+            init::init_logger,
+        },
     };
     //use super::*;
 
     async fn init_pool() {
         init_logger();
+
         let database_url = dotenv::var("SQLITE_DATABASE_URL").expect("SQLITE_DATABASE_URL must be set");
         connection::create_db_pool(&database_url).await.unwrap();
     }
@@ -409,6 +413,7 @@ mod tests {
     async fn step_insert_one() {
         let mut entity = Article::new(100, "vvvv", None);
         entity.content = Some("abc".to_string());
+        entity.status = Status::Published;
 
         let qb = Insert::one(&entity, &ARTICLE_KEY);
 

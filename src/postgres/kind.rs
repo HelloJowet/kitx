@@ -166,13 +166,12 @@ impl PgHasArrayType for DataKind {
 }
 
 impl ValueConvert for DataKind {
-    fn convert(value: &dyn Any) -> Self {
+    fn try_convert(value: &dyn Any) -> Option<Self> {
         macro_rules! try_convert {
             ($($type:ty => $variant:expr),*) => {
                 $(if let Some(v) = unwrap_option::<$type>(value) {
-                    return $variant(v);
+                    return Some($variant(v));
                 })*
-                return DataKind::Null;
             };
         }
 
@@ -195,11 +194,31 @@ impl ValueConvert for DataKind {
             &[u8] => |v: &&[u8]| DataKind::Bytea(Arc::from(*v)),
             bool => |v: &bool| DataKind::Bool(*v),
             Uuid => |v: &Uuid| DataKind::Uuid(*v),
-            Value => |v: &Value| DataKind::Json(Arc::new(v.clone())),
+            Value => |v: &Value| match v {
+                Value::String(s) => DataKind::Text(s.clone()),
+                Value::Number(n) => {
+                    if let Some(i) = n.as_i64() {
+                        DataKind::Int8(i)
+                    } else if let Some(f) = n.as_f64() {
+                        DataKind::Float8(f)
+                    } else {
+                        DataKind::Json(Arc::new(v.clone()))
+                    }
+                },
+                Value::Bool(b) => DataKind::Bool(*b),
+                Value::Null => DataKind::Null,
+                _ => DataKind::Json(Arc::new(v.clone())),
+            },
             IpAddr => |v: &IpAddr| DataKind::Inet(*v),
             IpNetwork => |v: &IpNetwork| DataKind::Cidr(*v),
             MacAddress => |v: &MacAddress| DataKind::MacAddr(*v)
         );
+
+        None
+    }
+
+    fn convert(value: &dyn Any) -> Self {
+        Self::try_convert(value).unwrap_or(DataKind::Null)
     }
 
     fn is_default_value(value: &Self) -> bool {
@@ -244,7 +263,26 @@ impl_from!(NaiveTime, DataKind::Time);
 impl_from!(NaiveDateTime, DataKind::Timestamp);
 impl_from!(DateTime<Utc>, DataKind::Timestamptz);
 impl_from!(Duration, DataKind::Interval);
-impl_from!(Value, |value: Value| DataKind::Json(Arc::new(value)));
+// impl_from!(Value, |value: Value| DataKind::Json(Arc::new(value)));
+impl From<Value> for DataKind {
+    fn from(value: Value) -> Self {
+        match value {
+            Value::String(s) => DataKind::Text(s),
+            Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    DataKind::Int8(i)
+                } else if let Some(f) = n.as_f64() {
+                    DataKind::Float8(f)
+                } else {
+                    DataKind::Json(Arc::new(Value::Number(n)))
+                }
+            }
+            Value::Bool(b) => DataKind::Bool(b),
+            Value::Null => DataKind::Null,
+            _ => DataKind::Json(Arc::new(value)),
+        }
+    }
+}
 impl_from!(Uuid, DataKind::Uuid);
 impl_from!(Decimal, DataKind::Numeric);
 impl_from!(IpAddr, DataKind::Inet);

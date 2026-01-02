@@ -2,6 +2,8 @@ use std::{iter::once, marker::PhantomData};
 
 use field_access::FieldAccess;
 use log::error;
+use serde::Serialize;
+use serde_json::Value;
 use sqlx::{Database, Encode, QueryBuilder, Type};
 
 use crate::common::{conversion::ValueConvert, fields::batch_extract, helper::get_table_name, types::PrimaryKey};
@@ -16,7 +18,7 @@ use crate::common::{conversion::ValueConvert, fields::batch_extract, helper::get
 /// * `VAL` - 实现 Encode 和 Type traits 的值类型
 pub struct Insert<'a, ET, DB, VAL>
 where
-    ET: FieldAccess,
+    ET: FieldAccess + Serialize,
     DB: Database,
     VAL: Encode<'a, DB> + Type<DB> + 'a,
 {
@@ -27,9 +29,9 @@ where
 
 impl<'a, ET, DB, VAL> Insert<'a, ET, DB, VAL>
 where
-    ET: FieldAccess,
+    ET: FieldAccess + Serialize,
     DB: Database,
-    VAL: Encode<'a, DB> + Type<DB> + ValueConvert + 'a,
+    VAL: Encode<'a, DB> + Type<DB> + ValueConvert + From<Value> + Clone + 'a,
 {
     /// 开始构建 INSERT 查询（使用实体的默认表名）
     ///
