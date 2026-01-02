@@ -358,34 +358,57 @@ mod tests {
             kind::DataKind,
             query::{execute, fetch_all, fetch_one, fetch_scalar},
         },
-        test_utils::{
-            article::Article,
-            init::{get_database_url, init_logger},
-        },
+        test_utils::{article::Article, init::init_logger},
     };
     //use super::*;
     async fn init_pool() {
         init_logger();
-        let database_url = get_database_url().await;
+        let database_url = dotenv::var("MYSQL_DATABASE_URL").expect("MYSQL_DATABASE_URL must be set");
         connection::create_db_pool(&database_url).await.unwrap();
     }
 
     const ARTICLE_KEY: PrimaryKey = PrimaryKey::Single("id", true);
 
     #[tokio::test]
-    async fn test_insert_one() {
+    async fn test_lifecycle() {
+        init_pool().await;
+
+        // Clean slate
+        let qb_cleanup = Delete::<Article>::table().finish();
+        let _ = execute(qb_cleanup).await;
+
+        // Reset auto_increment to ensure IDs start at 1
+        let qb_seq = QB::new("ALTER TABLE article AUTO_INCREMENT = 1");
+        let _ = execute(qb_seq).await;
+
+        step_insert_one().await;
+        step_insert_many().await;
+        step_upsert_one().await;
+        step_update_one().await;
+        step_update_with_filter().await;
+
+        step_find_all().await;
+        step_find_one().await;
+        step_nested_subquery().await;
+        step_with_cte().await;
+        step_find_list_paginated().await;
+        step_find_list_by_cursor().await;
+
+        step_delete_with_filter().await;
+        step_delete_by_primary_key().await;
+    }
+
+    async fn step_insert_one() {
         let mut entity = Article::new(100, "vvvv", None);
         entity.content = Some("abc".to_string());
 
         let qb = Insert::one(&entity, &ARTICLE_KEY);
 
-        init_pool().await;
         let result = execute(qb).await.unwrap();
         println!("Inserted {} rows.", result.rows_affected());
     }
 
-    #[tokio::test]
-    async fn test_insert_many() {
+    async fn step_insert_many() {
         let mut entity1 = Article::new(100, "t111", None);
         entity1.content = Some("abc111".to_string());
         let mut entity2 = Article::new(100, "t2222", None);
@@ -394,39 +417,33 @@ mod tests {
         let binding = [entity1, entity2];
         let qb = Insert::many(&binding, &ARTICLE_KEY);
 
-        init_pool().await;
         let result = execute(qb).await.unwrap();
         println!("Inserted {} rows.", result.rows_affected());
     }
 
-    #[tokio::test]
-    async fn test_upsert_one() {
+    async fn step_upsert_one() {
         let mut entity = Article::new(100, "t1", None);
         entity.content = Some("abc".to_string());
         entity.id = 0;
 
         let qb = Upsert::one(&entity, &ARTICLE_KEY);
 
-        init_pool().await;
         let result = execute(qb).await.unwrap();
-        assert_eq!(result.rows_affected(), 1);
+        assert_eq!(result.rows_affected(), 1); // MySQL ON DUPLICATE KEY UPDATE returns 1 for insert
     }
 
-    #[tokio::test]
-    async fn test_update_one() {
+    async fn step_update_one() {
         let mut entity = Article::new(110, "test9999", None);
         entity.content = Some("abc111".to_string());
         entity.id = 1;
 
         let qb = Update::one(&entity, &ARTICLE_KEY, true).unwrap();
 
-        init_pool().await;
         let result = execute(qb).await.unwrap();
         println!("Updated {} rows.", result.rows_affected());
     }
 
-    #[tokio::test]
-    async fn test_update_with_filter() {
+    async fn step_update_with_filter() {
         let set_build_fn: fn(&mut QB) = |qb| {
             qb.push("views = views + 1");
         };
@@ -437,56 +454,45 @@ mod tests {
 
         let qb = Update::<Article>::table().custom(set_build_fn).filter(filter_build_fn).finish();
 
-        init_pool().await;
         let result = execute(qb).await.unwrap();
         println!("Updated {} rows.", result.rows_affected());
     }
 
-    #[tokio::test]
-    async fn test_delete_by_primary_key() {
+    async fn step_delete_by_primary_key() {
         let idv = vec![1.into()];
 
         let qb = Delete::<Article>::table().by_primary_key(&ARTICLE_KEY, &idv).finish();
 
-        init_pool().await;
         let result = execute(qb).await.unwrap();
         println!("Deleted {} rows.", result.rows_affected());
     }
 
-    #[tokio::test]
-    async fn test_delete_with_filter() {
+    async fn step_delete_with_filter() {
         let filter_build_fn: fn(&mut QB) = |qb| {
             qb.push("id = ").push_bind(1 as i64);
         };
         let qb = Delete::<Article>::table().filter(filter_build_fn).finish();
 
-        init_pool().await;
         let result = execute(qb).await.unwrap();
         println!("Deleted {} rows.", result.rows_affected());
     }
 
-    #[tokio::test]
-    async fn test_find_all() {
+    async fn step_find_all() {
         let qb = Select::<Article>::table().finish();
 
-        init_pool().await;
         let list = fetch_all::<Article>(qb).await.unwrap();
         dbg!(&list);
     }
 
-    #[tokio::test]
-    async fn test_find_one() {
+    async fn step_find_one() {
         let binding = vec![1.into()];
         let qb = Select::<Article>::table().by_primary_key(&ARTICLE_KEY, &binding).finish();
 
-        init_pool().await;
         let article = fetch_one::<Article>(qb).await.unwrap();
         dbg!(&article);
     }
 
-    #[tokio::test]
-    async fn test_nested_subquery() {
-        init_pool().await;
+    async fn step_nested_subquery() {
         let avg_views_subquery = Subquery::<Article>::table()
             .columns(|b| {
                 b.push("AVG(views)");
@@ -504,19 +510,15 @@ mod tests {
 
         let result = fetch_all::<Article>(qb).await.unwrap();
         dbg!(&result);
-        //assert_eq!(result.len(), 1);
-        //assert_eq!(result[0].views, 150);
     }
 
-    #[tokio::test]
-    async fn test_find_list_paginated() {
+    async fn step_find_list_paginated() {
         let filter_build_fn = |qb: &mut QB| {
             qb.push("id > ").push_bind(1 as i64);
         };
 
         let qb = Select::<Article>::table().filter(filter_build_fn).order_by("id", Order::Desc).paginate(1, 10);
 
-        init_pool().await;
         let list = fetch_all::<Article>(qb).await.unwrap();
 
         let qb2 = Select::<Article>::table()
@@ -532,11 +534,7 @@ mod tests {
         dbg!(pr);
     }
 
-    #[tokio::test]
-    async fn test_find_list_by_cursor() {
-        // 初始化连接池
-        init_pool().await;
-
+    async fn step_find_list_by_cursor() {
         // 测试参数
         let limit = 2;
         let column_key = "id";
@@ -570,14 +568,11 @@ mod tests {
         dbg!(&paginated_desc);
     }
 
-    #[tokio::test]
-    async fn test_with_cte() {
-        init_pool().await;
-
+    async fn step_with_cte() {
         let mut cte_builder = QB::new("WITH article_cte AS ");
         Subquery::<Article>::table()
             .filter(|b| {
-                b.push("id > ").push_bind(50.into());
+                b.push("id > ").push_bind(0.into()); // Changed to 0 to match data
             })
             .append_to(&mut cte_builder);
 
