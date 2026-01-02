@@ -279,7 +279,9 @@ If you haven't set up the database yet, follow these steps to create it and appl
 Once the databases are up and migrated:
 
 ```bash
-cargo test
+cargo test sqlite
+cargo test mysql
+cargo test postgres
 ```
 
 ---
@@ -335,55 +337,6 @@ cargo test
 
 更多使用例子，请参考文档、各数据库类型下的 builder 测试用例。
 查询语句的错误信息，使用log:error输出，请结合日志组件库和sqlx:Error进行处理。
-
----
-
-### 🧪 运行测试
-
-需先启动数据库服务，我们提供了 Docker Compose 配置：
-
-```bash
-# 启动 MySQL (端口 10000) 和 PostgreSQL (端口 10001)
-docker compose up -d
-```
-
-#### 数据库设置与迁移
-
-如果您尚未设置数据库，请按照以下步骤创建数据库并应用迁移：
-
-1. **安装 sqlx-cli**:
-   ```bash
-   cargo install sqlx-cli
-   ```
-
-2. **设置数据库**:
-
-   **SQLite**:
-   ```bash
-   # 创建数据库文件
-   sqlx database create --database-url sqlite:./kitxtest.db
-   
-   # 执行迁移
-   sqlx migrate run --source migrations/sqlite --database-url sqlite:./kitxtest.db
-   ```
-
-   **MySQL**:
-   ```bash
-   sqlx migrate run --source migrations/mysql --database-url mysql://root:@localhost:10000/kitxtest
-   ```
-
-   **PostgreSQL**:
-   ```bash
-   sqlx migrate run --source migrations/postgres --database-url postgres://postgres@localhost:10001/kitxtest
-   ```
-
-#### 执行测试
-
-数据库准备就绪后：
-
-```bash
-cargo test
-```
 
 ---
 
